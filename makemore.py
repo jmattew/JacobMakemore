@@ -6,7 +6,6 @@ import matplotlib.pyplot as plt
 
 
 words = open('names.txt', 'r').read().splitlines() 
-print(words[:10])
 #print(len(words))
 #print(min(len(w) for w in words))
 #print(max(len(w) for w in words))
@@ -41,8 +40,8 @@ for w in words:
 itos = {i:s for s,i in stoi.items()}
 
 #to help us visualize the 2d array, we can plot it as a heatmap
-plt.figure(figsize=(16,16))
-plt.imshow(N, cmap='Blues')
+plt.figure(figsize=(20,9))
+plt.imshow(N, cmap='Blues', aspect = 'auto')
 for i in range(28):
     for j in range(28):
         chstr = itos[i] + itos[j]
