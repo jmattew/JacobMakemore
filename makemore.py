@@ -65,7 +65,7 @@ for i in range(5):
 
 log_likelihood = 0.0
 n = 0
-for w in ['andrejq']:
+for w in words[:3]:
     chs = ['.'] + list(w) + ['.']
     for ch1, ch2 in zip(chs,chs[1:]):
         ix1 = stoi[ch1]
