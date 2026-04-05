@@ -25,13 +25,12 @@ for w in words: # in the first column we are printing the number of words specif
 
 
 chars = sorted(list(set(''.join(words))))
-stoi = {s:i for i,s in enumerate(chars)} # mapping of s to i in the 2d array, rows is s, columns is i
-stoi['<S>'] = 26 # <S> and <E> are not normal characters in the alphabet so we have to manually add them in 
-stoi['<E>'] = 27
+stoi = {s:i+1 for i,s in enumerate(chars)} # mapping of s to i in the 2d array, rows is s, columns is i
+stoi['.'] = 0 # <S> and <E> are not normal characters in the alphabet so we have to manually add them in 
 # we have 26 letters + the S and E special characters so we want a 28x28 2d array
-N = torch.zeros((28,28),dtype=torch.int32) # pytorch automatically sets the data to be 32 bit floats, but we want to use integers as we are storing counts
+N = torch.zeros((27,27),dtype=torch.int32) # pytorch automatically sets the data to be 32 bit floats, but we want to use integers as we are storing counts
 for w in words: 
-    chs = ['<S>'] + list(w) + ['<E>']
+    chs = ['.'] + list(w) + ['.']
     for ch1, ch2 in zip(chs,chs[1:]): 
         ix1 = stoi[ch1]
         ix2 = stoi[ch2]
@@ -39,13 +38,57 @@ for w in words:
 
 itos = {i:s for s,i in stoi.items()}
 
+g = torch.Generator().manual_seed(2147483647)
+ix = torch.multinomial(N[0].float(), num_samples=1, replacement=True, generator=g).item()
+#itos[ix]
+P = (N+1).float() # set it to N+1 to ensure that no probability is 0 so log likelihood is not undefined (like infinity)
+P = P/P.sum(1, keepdims=True) # normalize each row to sum to 1
+for i in range(5):
+    out = []
+    ix = 0
+    while True:
+        p = P[ix]
+        #p = torch.ones(27)/27.0 # uniform distributionwhere every output is equally likely(model is untrained here, output will be terrible)
+        ix = torch.multinomial(p, num_samples=1, replacement=True, generator=g).item()
+        out.append(itos[ix])
+        #print(itos[ix])
+        if ix == 0:
+            break;
+    #print(''.join(out))
+
+
+#GOAL: maximize likelihood of the data w.r.t. model parameters (statistical modeling)
+#equivalient to maximizing the log_likelihood(because log is monotonic)
+#equivalent to minimize the negative log_likelihood
+#equivalent to minimizing the average negative log_likelihood
+#log(a*b*c) = log(a) + log(b) + log(c)
+
+log_likelihood = 0.0
+n = 0
+for w in ['andrejq']:
+    chs = ['.'] + list(w) + ['.']
+    for ch1, ch2 in zip(chs,chs[1:]):
+        ix1 = stoi[ch1]
+        ix2 = stoi[ch2]
+        prob = P[ix1,ix2]
+        logprob = torch.log(prob)
+        log_likelihood += logprob
+        n+=1
+        print(f'{ch1}{ch2}: {prob:.4f} {logprob:.4f}')
+print(f'{log_likelihood=}')
+nll = -log_likelihood
+print(f'{nll=}') # negative log_likelihood
+print(f'{nll/n}') #average negative log_likelihood, in practice we want to minimize this as it reflects the quality of your model
+# the lowest the average negative log_likelihood can go is 0, the lower it is the better as it means higher probabilities for values
+
+
 #to help us visualize the 2d array, we can plot it as a heatmap
-plt.figure(figsize=(20,9))
-plt.imshow(N, cmap='Blues', aspect = 'auto')
-for i in range(28):
-    for j in range(28):
-        chstr = itos[i] + itos[j]
-        plt.text(j,i,chstr, ha="center", va="bottom", color="gray")
-        plt.text(j,i,str(N[i,j].item()), ha="center", va="top", color="gray")
-plt.axis('off')
-plt.show()
+# plt.figure(figsize=(20,9))
+# plt.imshow(N, cmap='Blues', aspect = 'auto')
+# for i in range(27):
+#     for j in range(27):
+#         chstr = itos[i] + itos[j]
+#         plt.text(j,i,chstr, ha="center", va="bottom", color="gray")
+#         plt.text(j,i,str(N[i,j].item()), ha="center", va="top", color="gray")
+# plt.axis('off')
+# plt.show()
