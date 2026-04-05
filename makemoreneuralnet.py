@@ -1,6 +1,7 @@
 from typing import Any
 import torch
 import matplotlib.pyplot as plt
+import torch.nn.functional as F
 
 words = open('names.txt', 'r').read().splitlines()  
 
@@ -58,3 +59,8 @@ ys = torch.tensor(ys)
 #the neural net is made up of neurons and the neurons have weights and biases which act multiplicatively on the inputs
 #before we were feeding in the integers of the character's place in the alphabet into the neural net but that won't really give an accurate value
 #so we can use one hat encoding to represent the characters and feed them into the neural net
+
+#in one hat encoding we will take an integer like 13, then make a vector of all 0s except the 13th dimension of it which will be 1
+xenc = F.one_hot(xs, num_classes=27)
+plt.imshow(xenc)
+plt.show()
