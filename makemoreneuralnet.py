@@ -62,5 +62,18 @@ ys = torch.tensor(ys)
 
 #in one hot encoding we will take an integer like 13, then make a vector of all 0s except the 13th dimension of it which will be 1
 xenc = F.one_hot(xs, num_classes=27)
+
+
+#W = torch.randn(27,1) # W represents one neuron with a weight, W will be a column vector of 27 vectors, 1 column, 27 rows, the weights in W are multiplied by the inputs
+#xenc @ W # the @ is the matrix multiplication operator in pytorch, the output of this operation will be a 5x1 column vector
+# when you multiply two matriced together, the number of columns in the first matrix must be equal to the number of rows in the second matrix
+# also, the number of rows in the first matrix and the number of columns in the second matrix become the number of rows and columns in the answer
+
+W = torch.randn(27,27) # now we have 27 neurons, each neuron has a weight, W will be a 27x1 column vector of weights 
+xenc @ W # doing the matrix multiplication will evaluate all 27 neurons(weights) in parallel against the 5 inputs so 5x27 X 27x27 = 5x27 with 5 inputs we get 27 outputs
+# our neural net here will only have one layer, so the output of the first layer will be our results
+
+
+
 plt.imshow(xenc)
 plt.show()
