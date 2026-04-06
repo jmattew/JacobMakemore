@@ -82,6 +82,8 @@ print(f'{nll/n}') #average negative log_likelihood, in practice we want to minim
 # the lowest the average negative log_likelihood can go is 0, the lower it is the better as it means higher probabilities for values
 
 
+
+
 #to help us visualize the 2d array, we can plot it as a heatmap
 # plt.figure(figsize=(20,9))
 # plt.imshow(N, cmap='Blues', aspect = 'auto')

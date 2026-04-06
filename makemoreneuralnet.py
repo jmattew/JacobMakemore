@@ -40,7 +40,10 @@ n = 0
 # the lowest the average negative log_likelihood can go is 0, the lower it is the better as it means higher probabilities for values
 
 #create training set of all bigrams (x,y): x is the first character, y is the predicted character
-xs = []; ys = []
+xs = []; ys = [] # x is for input to the neural net, ys represent labels for the correct next character(output from the neural net)
+g = torch.Generator().manual_seed(2147483647) # makes it so we see the same values as Andrej Karpathy's video
+w = torch.randn(27,27, generator=g) # randomly initialize 27 neuron's weights, each neuron receives 27 inputs
+
 
 for w in words[:1]: 
     chs = ['.'] + list(w) + ['.']
@@ -60,6 +63,9 @@ ys = torch.tensor(ys)
 #before we were feeding in the integers of the character's place in the alphabet into the neural net but that won't really give an accurate value
 #so we can use one hat encoding to represent the characters and feed them into the neural net
 
+
+#----------------------One Forward Pass-----------------------------
+
 #in one hot encoding we will take an integer like 13, then make a vector of all 0s except the 13th dimension of it which will be 1
 xenc = F.one_hot(xs, num_classes=27)
 
@@ -70,9 +76,21 @@ xenc = F.one_hot(xs, num_classes=27)
 # also, the number of rows in the first matrix and the number of columns in the second matrix become the number of rows and columns in the answer
 
 W = torch.randn(27,27) # now we have 27 neurons, each neuron has a weight, W will be a 27x1 column vector of weights 
-xenc @ W # doing the matrix multiplication will evaluate all 27 neurons(weights) in parallel against the 5 inputs so 5x27 X 27x27 = 5x27 with 5 inputs we get 27 outputs
+logits = xenc @ W #get log counts, doing the matrix multiplication will evaluate all 27 neurons(weights) in parallel against the 5 inputs so 5x27 X 27x27 = 5x27 with 5 inputs we get 27 outputs
 # our neural net here will only have one layer, so the output of the first layer will be our results
+counts = logits.exp() # get something that looks like counts with.exp(), the .exp() is the exponential function, it will convert the output to a probability distribution which are values we can actually use
+prob = counts/counts.sum(1, keepdims=True) # normalize the counts so that all the values when summed together sum up to sum to 1
+# now these are proper probabilies which we can use to predict the next character
 
+#counts and probs make up the softmax activation function, which takes logits, exponentiates them(e^logit) and then divides by the sum of the 
+#exponentiated values to get a probability distribution so now all the values sum up to 1
+
+
+
+# all of the above functions are differentiable which means we can backpropogate through them to update the weights
+
+
+#-------------------------------------------------------
 
 
 plt.imshow(xenc)
