@@ -40,7 +40,7 @@ n = 0
 # the lowest the average negative log_likelihood can go is 0, the lower it is the better as it means higher probabilities for values
 
 #create training set of all bigrams (x,y): x is the first character, y is the predicted character
-xs = []; ys = [] # x is for input to the neural net, ys represent labels for the correct next character(output from the neural net)
+xs = []; ys = [] # x is for input to the neural net, ys represent labels for the actualnext character(output from the neural net)
 g = torch.Generator().manual_seed(2147483647) # makes it so we see the same values as Andrej Karpathy's video
 w = torch.randn(27,27, generator=g) # randomly initialize 27 neuron's weights, each neuron receives 27 inputs
 
@@ -79,7 +79,7 @@ W = torch.randn(27,27) # now we have 27 neurons, each neuron has a weight, W wil
 logits = xenc @ W #get log counts, doing the matrix multiplication will evaluate all 27 neurons(weights) in parallel against the 5 inputs so 5x27 X 27x27 = 5x27 with 5 inputs we get 27 outputs
 # our neural net here will only have one layer, so the output of the first layer will be our results
 counts = logits.exp() # get something that looks like counts with.exp(), the .exp() is the exponential function, it will convert the output to a probability distribution which are values we can actually use
-prob = counts/counts.sum(1, keepdims=True) # normalize the counts so that all the values when summed together sum up to sum to 1
+probs = counts/counts.sum(1, keepdims=True) # normalize the counts so that all the values when summed together sum up to sum to 1
 # now these are proper probabilies which we can use to predict the next character
 
 #counts and probs make up the softmax activation function, which takes logits, exponentiates them(e^logit) and then divides by the sum of the 
@@ -88,6 +88,38 @@ prob = counts/counts.sum(1, keepdims=True) # normalize the counts so that all th
 
 
 # all of the above functions are differentiable which means we can backpropogate through them to update the weights
+
+
+#-------------------------------------------------------
+
+
+#----------------------Now Backward Pass with Backpropagation---------------------------------
+
+nlls = torch.zeros(5)
+for i in range(5):
+    #ith bigram
+    x = xs[i].item() # input character index
+    y = ys[i].item() # output or label character index
+    print("--------")
+    print(f'bigrame example {i+1}: {itos[x]}{itos[y]} (indexes {x},{y})')
+    print(f'input to the neural net: ', x)
+    print(f'output probabilities of the neural net: ', probs[i])
+    print(f'label or actual next character: ', y)
+    p = probs[i,y]
+    print('probabilty assigned by the neural net to the actual correct next character:', p.item())
+    logp = torch.log(p)
+    print('log likelihood: ', logp.item())
+    nll = -logp
+    print('negative log likelihood: ', nll.item())
+    nlls[i] = nll
+
+print('========')
+print('average negative log likelihood: ', nlls.mean().item())
+
+
+
+
+
 
 
 #-------------------------------------------------------
