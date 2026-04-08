@@ -65,6 +65,12 @@ for p in parameters:
 #prob = counts/counts.sum(1, keepdims=True)
 #loss = -prob[torch.arange(Y.shape[0]), Y].log().mean()
 
+#We want to find the best leanring rate for the model, so we will try different learning rates and see which one works best
+lre = torch.linspace(-3,0,1000) # learning rate exponent
+lrs = 10**lre # learning rate(10 to the power of learning rate exponent)
+
+lri = [] # to keep track of learning rates we've used
+lossi = [] # to keep track of losses we've seen
 
 for k in range(1000): # we go through 10 iterations to train the model
 
@@ -82,11 +88,19 @@ for k in range(1000): # we go through 10 iterations to train the model
     loss.backward() # backpropgation
 
     #Update Parameters
+    #lr = lrs[k]
+    lr = 0.1# we found that the best learning rate is about 0.1 based on tracking the stats
     for p in parameters:
-        p.data += -0.1 * p.grad # learning rate * gradients
+        p.data += -lr * p.grad # learning rate * gradients
+
+    #track stats
+    #lri.append(lr)
+    #lossi.append(loss.item())
 
 #loss = -probs[torch.arange(num), Y].log().mean()
-print(loss.item())
+plt.plot(lri,lossi) # print out the learning rate against the loss to see the most stable learning rate that minimizes loss
+plt.show()
+#print(loss.item())
 
 #We do the ix method where we randomly sample from the main dataset because it's more efficient and nearly as accurate
 #as using all the data at once, also it helps us avoid overfitting and generalizes better to new data,
@@ -110,3 +124,7 @@ print(loss.item())
 #     #Update Parameters
 #     for p in parameters:
 #         p.data += -0.1 * p.grad # learning rate * gradients
+
+
+
+
