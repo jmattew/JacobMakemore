@@ -72,7 +72,7 @@ lrs = 10**lre # learning rate(10 to the power of learning rate exponent)
 lri = [] # to keep track of learning rates we've used
 lossi = [] # to keep track of losses we've seen
 
-for k in range(1000): # we go through 10 iterations to train the model
+for k in range(10000): # we go through 10 iterations to train the model
 
     ix = torch.randint(0, X.shape[0], (32,)) # making minibatches of 32 to train the model all rather than using 32,000 datapoints
     #FORWARD PASS
@@ -89,7 +89,8 @@ for k in range(1000): # we go through 10 iterations to train the model
 
     #Update Parameters
     #lr = lrs[k]
-    lr = 0.1# we found that the best learning rate is about 0.1 based on tracking the stats
+    lr = 0.01# we found that the best learning rate is about 0.1 based on tracking the stats for a more generalized model
+    # we decrease learning rate for the model to understand more specific patterns in later stages of training
     for p in parameters:
         p.data += -lr * p.grad # learning rate * gradients
 
@@ -98,9 +99,9 @@ for k in range(1000): # we go through 10 iterations to train the model
     #lossi.append(loss.item())
 
 #loss = -probs[torch.arange(num), Y].log().mean()
-plt.plot(lri,lossi) # print out the learning rate against the loss to see the most stable learning rate that minimizes loss
-plt.show()
-#print(loss.item())
+#plt.plot(lri,lossi) # print out the learning rate against the loss to see the most stable learning rate that minimizes loss
+#plt.show()
+print(loss.item())
 
 #We do the ix method where we randomly sample from the main dataset because it's more efficient and nearly as accurate
 #as using all the data at once, also it helps us avoid overfitting and generalizes better to new data,
