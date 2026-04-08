@@ -6,6 +6,8 @@ import torch.nn.functional as F
 
 words = open('names.txt', 'r').read().splitlines()  
 
+g = torch.Generator().manual_seed(2147483647) 
+
 chars = sorted(list(set(''.join(words))))
 stoi = {s:i+1 for i,s in enumerate(chars)} # mapping of s to i in the 2d array, rows is s, columns is i
 stoi['.'] = 0
@@ -15,19 +17,19 @@ itos = {i:s for s,i in stoi.items()}
 
 #this file is for the multi-layer perceptron model version of the bigram language model
 
-block_size = 3 # context length, how many characters do we take in to predict the next character?
+block_size = 4 # context length, how many characters do we take in to predict the next character?
 X, Y = [], [] # X is the training input, each row is a context of the number of characters specified in block_size
 # Y is the training output, each row is the next character in the context, basically the matching entry in Y that you want the model to predict
 
-for w in words[:5]:
-    print(w)
+for w in words:
+    #print(w)
     context = [0] * (block_size - 1)
     for ch in w + '.':
         ix = stoi[ch]
         X.append(context)
         Y.append(ix)
 
-        print(''.join(itos[i] for i in context), '--->', itos[ix])
+        #print(''.join(itos[i] for i in context), '--->', itos[ix])
         context = context[1:] + [ix] # crop and append
 
 X = torch.tensor(X)
@@ -38,9 +40,44 @@ Y = torch.tensor(Y)
 #the entries of C must be floats as they are learned continuous values which we will use to compute dot products with the one hot encoded input to get logits
 
 #So X is what the model sees, Y is the correct next character that comes after the X data and the learned outputs live in parameters like C
-C = torch.randn((27,2)) # our lookup table, 27 rows for the 27 characters, 2 columns for the 2 hidden units
+C = torch.randn((27,2), generator = g) # our lookup table, 27 rows for the 27 characters, 2 columns for the 2 hidden units
 print(C)
 
+
+
+
+
+W1 = torch.randn((6,100), generator = g)
+b1 = torch.randn(100, generator = g)
+
+
+
+W2 = torch.randn((100,27), generator = g) 
+b2 = torch.randn(27, generator = g) 
+
+
+parameters = [C, W1, b1, W2, b2]
+
+#CLASSIFICATION - use cross_entropy function rather than the next 3 lines because counts, prob and loss lines
+#require more memory usage and is less efficient as new tensors are created at each step on the forward pass,
+#same way with the backward pass, everything is much more efficient, also numbers that result from it are much more easy to read
+
+#counts = logits.exp() # expnentiate the logits to get counts
+#prob = counts/counts.sum(1, keepdims=True)
+#loss = -prob[torch.arange(Y.shape[0]), Y].log().mean()
+
+#FORWARD PASS
 emb = C[X] # each row of emb is the embedding of the corresponding row of X
-W1 = torch.randn((6,100))
-b1 = torch.randn(100)
+h = torch.tanh(emb.view(-1,6) @ W1 + b1)
+logits = h @ W2 + b2
+loss = F.cross_entropy(logits, Y) # cross_entropy function also calculates the loss with logits and Y tensor
+
+
+# Now for Y, we have to pluck out the character we want and the actual probability we have for predicting it
+#prob[torch.arange(Y.shape[0]), Y]
+
+
+#loss = -probs[torch.arange(num), Y].log().mean()
+#print(loss.item())
+
+
