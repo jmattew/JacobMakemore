@@ -15,9 +15,10 @@ stoi['.'] = 0
 N = torch.zeros((27,27),dtype=torch.int32) # pytorch automatically sets the data to be 32 bit floats, but we want to use integers as we are storing counts
 
 itos = {i:s for s,i in stoi.items()}
+block_size = 3 # context length, how many characters do we take in to predict the next character?
+
 
 def build_dataset(words):
-    block_size = 4 # context length, how many characters do we take in to predict the next character?
     X, Y = [], [] # X is the training input, each row is a context of the number of characters specified in block_size
     # Y is the training output, each row is the next character in the context, basically the matching entry in Y that you want the model to predict
 
@@ -101,5 +102,37 @@ for k in range(10000): # we go through 10 iterations to train the model
     #lri.append(lr)
     #lossi.append(loss.item())
 
-print(loss.item())
+print('training loss:', loss.item())
+
+emb = C[Xva] # use XTrain data, each row of emb is the embedding of the corresponding row of X, X[ix] is [32,3,2]
+h = torch.tanh(emb.view(-1,6) @ W1 + b1)
+logits = h @ W2 + b2 # logits are the unnormalized probabilities for each character
+loss = F.cross_entropy(logits, Yva)
+print('validation loss:', loss.item())
+
+
+
+
+#Actually testing the model on the test data to see the output
+g = torch.Generator().manual_seed(2147483647 + 10)
+
+for _ in range(20):
+
+    out = []
+    context = [0] * block_size
+    while True:
+        emb = C[torch.tensor([context])] # just first dimension of context, use XTrain data, each row of emb is the embedding of the corresponding row of X, X[ix] is [32,3,2]
+        h = torch.tanh(emb.view(-1,6) @ W1 + b1)
+        logits = h @ W2 + b2 # logits are the unnormalized probabilities for each character
+        probs = F.softmax(logits, dim=1) # softmax just exponentiates the logits and makes them sum to 1
+        ix = torch.multinomial(probs, num_samples=1, replacement=True, generator=g).item()
+        out.append(itos[ix])
+        context = context[1:] + [ix]
+        if ix == 0:
+            break
+    print(''.join(out))
+
+
+
+
 
