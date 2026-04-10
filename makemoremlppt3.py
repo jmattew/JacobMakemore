@@ -9,19 +9,20 @@ words = open('names.txt', 'r').read().splitlines()
 
 g = torch.Generator().manual_seed(2147483647) 
 
+#build the vocabulary of characters in the dataset
 chars = sorted(list(set(''.join(words))))
 stoi = {s:i+1 for i,s in enumerate(chars)} # mapping of s to i in the 2d array, rows is s, columns is i
 stoi['.'] = 0
 N = torch.zeros((27,27),dtype=torch.int32) # pytorch automatically sets the data to be 32 bit floats, but we want to use integers as we are storing counts
-
 itos = {i:s for s,i in stoi.items()}
-block_size = 3 # context length, how many characters do we take in to predict the next character?
 
+vocab_size = len(itos)
+block_size = 3
 
 def build_dataset(words):
     X, Y = [], [] # X is the training input, each row is a context of the number of characters specified in block_size
     # Y is the training output, each row is the next character in the context, basically the matching entry in Y that you want the model to predict
-
+    
     for w in words:
         #print(w)
         context = [0] * (block_size)
@@ -46,6 +47,10 @@ Xtr, Ytr = build_dataset(words[:n1]) # training data, about 80% of data
 Xva, Yva = build_dataset(words[n1:n2]) # validation data, about 10% of data
 Xte, Yte = build_dataset(words[n2:]) # test data, about 10% of data
 
+
+n_embd = 10 # number of character embedding vectors
+n_hidden = 200 # number of neurons in hidden layer of mlp
+
 #C is the character embedding matrix where each row is a learned vector for one symbol(one of 27 characters)
 #before training we initialize the character embedding matrix with random values, from a normal distribution with mean 0 and standard deviation 1
 #the entries of C must be floats as they are learned continuous values which we will use to compute dot products with the one hot encoded input to get logits
@@ -56,12 +61,12 @@ C = torch.randn((27,2), generator = g) # our lookup table, 27 rows for the 27 ch
 # Now for Y, we have to pluck out the character we want and the actual probability we have for predicting it
 #prob[torch.arange(Y.shape[0]), Y]
 
-W1 = torch.randn((6,100), generator = g)
-b1 = torch.randn(100, generator = g)
+W1 = torch.randn((6,100), generator = g) * 0.01
+b1 = torch.randn(100, generator = g) * 0.01
 
 
-W2 = torch.randn((100,27), generator = g) 
-b2 = torch.randn(27, generator = g) 
+W2 = torch.randn((100,27), generator = g) * 0.01
+b2 = torch.randn(27, generator = g) * 0  
 
 
 parameters = [C, W1, b1, W2, b2]
@@ -69,20 +74,22 @@ parameters = [C, W1, b1, W2, b2]
 for p in parameters:
     p.requires_grad = True 
 
-#We want to find the best leanring rate for the model, so we will try different learning rates and see which one works best
-lre = torch.linspace(-3,0,1000) # learning rate exponent
-lrs = 10**lre # learning rate(10 to the power of learning rate exponent)
 
-lri = [] # to keep track of learning rates we've used
-lossi = [] # to keep track of losses we've seen
+max_steps = 20000
+batch_size = 32
+lossi = []
+for i in range(max_steps): # we go through 10 iterations to train the model
 
-for k in range(10000): # we go through 10 iterations to train the model
+    #minibatch construction
+    ix = torch.randint(0, Xtr.shape[0], (batch_size,), generator = g) # use XTrain data, making minibatches of 32 to train the model all rather than using 32,000 datapoints
+    Xb, Yb = Xtr[ix], Ytr[ix] # batch X, Y
 
-    ix = torch.randint(0, Xtr.shape[0], (32,)) # use XTrain data, making minibatches of 32 to train the model all rather than using 32,000 datapoints
     #FORWARD PASS
-    emb = C[Xtr[ix]] # use XTrain data, each row of emb is the embedding of the corresponding row of X, X[ix] is [32,3,2]
-    h = torch.tanh(emb.view(-1,6) @ W1 + b1)
-    logits = h @ W2 + b2 # logits are the unnormalized probabilities for each character
+    emb = C[Xb] # use XTrain data, each row of emb is the embedding of the corresponding row of X, X[ix] is [32,3,2]
+    embcat = emb.view(emb.shape[0],-1) # concatenate the vectors
+    hpreact = embcat @ W1 + b1 # hidden layer pre activation
+    h = torch.tanh(hpreact) # hidden layer
+    logits = h @ W2 + b2 # logits are the unnormalized probabilities for each character, this is the output layer
     loss = F.cross_entropy(logits, Ytr[ix]) # cross_entropy function also calculates the loss with logits and Y tensor
     #print(k, '   ', loss.item())
 
@@ -92,47 +99,42 @@ for k in range(10000): # we go through 10 iterations to train the model
     loss.backward() # backpropgation
 
     #Update Parameters
-    #lr = lrs[k]
-    lr = 0.1# we found that the best learning rate is about 0.1 based on tracking the stats for a more generalized model
+    # we found that the best learning rate is about 0.1 based on tracking the stats for a more generalized model
     # we decrease learning rate for the model to understand more specific patterns in later stages of training
+    lr = 0.1 if i<100000 else 0.01
     for p in parameters:
         p.data += -lr * p.grad # learning rate * gradients
 
     #track stats
-    #lri.append(lr)
-    #lossi.append(loss.item())
+    if i % 10000 == 0:
+        print(f'{i:7d}/{max_steps:7d} loss: {loss.item():.4f}')
 
+    lossi.append(loss.log10().item())
 print('training loss:', loss.item())
 
-emb = C[Xva] # use XTrain data, each row of emb is the embedding of the corresponding row of X, X[ix] is [32,3,2]
-h = torch.tanh(emb.view(-1,6) @ W1 + b1)
-logits = h @ W2 + b2 # logits are the unnormalized probabilities for each character
-loss = F.cross_entropy(logits, Yva)
-print('validation loss:', loss.item())
+#-torch.tensor(1.0/27.0).log() # this should be the probability of any character in the vocabulary
 
+#4 dimensional example of the issue:
+logits = torch.tensor([0.0, 0.0, 0.0, 0.0]) # if all the values are the same we see the uniform distribution
+probs = F.softmax(logits, dim=0)
+loss = -probs[2].log() # this is the loss for the correct character
+print(probs, '      loss: ', loss) # the value for the correct character's index should have a very high probability
 
+@torch.no_grad() # this disables gradient tracking for the following code
+def split_loss(split):
 
+    x, y = {
+        'train': (Xtr, Ytr),
+        'val': (Xva, Yva),
+        'test': (Xte, Yte),
+    }[split]
 
-#Actually testing the model on the test data to see the output
-g = torch.Generator().manual_seed(2147483647 + 10)
+    emb = C[x] # use XTrain data, each row of emb is the embedding of the corresponding row of X, X[ix] is [32,3,2]
+    embcat = emb.view(emb.shape[0],-1) # concatenate the vectors
+    h = torch.tanh(embcat @ W1 + b1) # hidden layer
+    logits = h @ W2 + b2 # logits are the unnormalized probabilities for each character, this is the output layer
+    loss = F.cross_entropy(logits, y) # cross_entropy function also calculates the loss with logits and Y tensor
+    print(split, loss.item())
 
-for _ in range(20):
-
-    out = []
-    context = [0] * block_size
-    while True:
-        emb = C[torch.tensor([context])] # just first dimension of context, use XTrain data, each row of emb is the embedding of the corresponding row of X, X[ix] is [32,3,2]
-        h = torch.tanh(emb.view(-1,6) @ W1 + b1)
-        logits = h @ W2 + b2 # logits are the unnormalized probabilities for each character
-        probs = F.softmax(logits, dim=1) # softmax just exponentiates the logits and makes them sum to 1
-        ix = torch.multinomial(probs, num_samples=1, replacement=True, generator=g).item()
-        out.append(itos[ix])
-        context = context[1:] + [ix]
-        if ix == 0:
-            break
-    print(''.join(out))
-
-
-
-
-
+split_loss('train')
+split_loss('val')
