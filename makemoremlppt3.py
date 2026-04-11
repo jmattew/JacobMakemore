@@ -137,6 +137,9 @@ for i in range(max_steps): # we go through 10 iterations to train the model
     lossi.append(loss.log10().item())
 print('training loss:', loss.item())
 
+#print out running mean and standard deviations
+
+
 #-torch.tensor(1.0/27.0).log() # this should be the probability of any character in the vocabulary
 
 #4 dimensional example of the issue:
