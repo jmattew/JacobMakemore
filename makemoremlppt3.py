@@ -61,15 +61,26 @@ C = torch.randn((27,2), generator = g) # our lookup table, 27 rows for the 27 ch
 # Now for Y, we have to pluck out the character we want and the actual probability we have for predicting it
 #prob[torch.arange(Y.shape[0]), Y]
 
-W1 = torch.randn((6,100), generator = g) * 0.01
-b1 = torch.randn(100, generator = g) * 0.01
+W1 = torch.randn((n_embd * block_size,n_hidden), generator = g) * (5/3)/((n_embd * block_size)**0.5)
+b1 = torch.randn(n_hidden, generator = g) * 0.01
 
 
-W2 = torch.randn((100,27), generator = g) * 0.01
+W2 = torch.randn((n_hidden,vocab_size), generator = g) * 0.01
 b2 = torch.randn(27, generator = g) * 0  
 
+#these 4 are batch normalization parameters--------------------------------
+bngain = torch.ones((1,n_hidden))
+bnbias = torch.zeros((1,n_hidden))
+# gain and bias are trained usind backpropogation
 
-parameters = [C, W1, b1, W2, b2]
+#these 2 are buffers
+bnstd_running = torch.zeros((1,n_hidden))
+bnmean_running = torch.ones((1,n_hidden))
+#running mean and standard deviation are used to keep track of the mean and standard deviation of the hidden layer,
+#running mean and standard deviation are not trained with backpropogation, they are trained with the small updates in the training pass
+#--------------------------------------------------------------------------------
+
+parameters = [C, W1, b1, W2, b2, bngain, bnbias]
 
 for p in parameters:
     p.requires_grad = True 
@@ -87,7 +98,21 @@ for i in range(max_steps): # we go through 10 iterations to train the model
     #FORWARD PASS
     emb = C[Xb] # use XTrain data, each row of emb is the embedding of the corresponding row of X, X[ix] is [32,3,2]
     embcat = emb.view(emb.shape[0],-1) # concatenate the vectors
-    hpreact = embcat @ W1 + b1 # hidden layer pre activation
+
+    #linear layer
+    hpreact = embcat @ W1 #+ b1 # hidden layer pre activation
+
+    #batch normalization layer--------------------------------------------------------
+    bnmeani = hpreact.mean(0,keepdims=True)
+    bnstdi = hpreact.std(0,keepdims=True)
+    hpreact = bngain * (hpreact - bnmeani)/bnstdi + bnbias # in our forward passwe estimate the mean and standard deviation of the hidden layer 
+    #and then scale the hidden layer to have a mean of 0 and a standard deviation of 1
+    with torch.no_grad():
+        bmean_running = 0.999 * bnmean_running + 0.001 * bnmeani # to keep track of the running mean 
+        bnstd_running = 0.999 * bnstd_running + 0.001 * bnstdi # to keep track of the running standard deviation
+    #----------------------------------------------------------------------------------------
+
+    #non-linearity layer
     h = torch.tanh(hpreact) # hidden layer
     logits = h @ W2 + b2 # logits are the unnormalized probabilities for each character, this is the output layer
     loss = F.cross_entropy(logits, Ytr[ix]) # cross_entropy function also calculates the loss with logits and Y tensor
@@ -115,10 +140,18 @@ print('training loss:', loss.item())
 #-torch.tensor(1.0/27.0).log() # this should be the probability of any character in the vocabulary
 
 #4 dimensional example of the issue:
-logits = torch.tensor([0.0, 0.0, 0.0, 0.0]) # if all the values are the same we see the uniform distribution
-probs = F.softmax(logits, dim=0)
-loss = -probs[2].log() # this is the loss for the correct character
-print(probs, '      loss: ', loss) # the value for the correct character's index should have a very high probability
+#logits = torch.tensor([0.0, 0.0, 0.0, 0.0]) # if all the values are the same we see the uniform distribution
+##probs = F.softmax(logits, dim=0)
+#loss = -probs[2].log() # this is the loss for the correct character
+#print(probs, '      loss: ', loss) # the value for the correct character's index should have a very high probability
+
+with torch.no_grad():
+    emb = C[Xtr]
+    embcat = emb.view(emb.shape[0],-1)
+    hpreact = embcat @ W1 + b1
+    bnmean =  hpreact.mean(0,keepdims=True)
+    bnstd = hpreact.std(0,keepdims=True)
+    
 
 @torch.no_grad() # this disables gradient tracking for the following code
 def split_loss(split):
@@ -131,7 +164,9 @@ def split_loss(split):
 
     emb = C[x] # use XTrain data, each row of emb is the embedding of the corresponding row of X, X[ix] is [32,3,2]
     embcat = emb.view(emb.shape[0],-1) # concatenate the vectors
-    h = torch.tanh(embcat @ W1 + b1) # hidden layer
+    hpreact = embcat @ W1 + b1
+    hpreact = bngain * (hpreact - bnmean) / (bnstd + 1e-5) + bnbias
+    h = torch.tanh(bngain * (hpreact - bnmean) / (bnstd + 1e-5) + bnbias) # hidden layer
     logits = h @ W2 + b2 # logits are the unnormalized probabilities for each character, this is the output layer
     loss = F.cross_entropy(logits, y) # cross_entropy function also calculates the loss with logits and Y tensor
     print(split, loss.item())
